@@ -163,7 +163,7 @@ app.get("/", (req, res) => {
   res
     .type("html")
     .send(`<!doctype html>
-${baseHead}
+` + baseHead + `
 <body>
   <div class="particles" id="particles"></div>
   <main class="card" style="position:relative; z-index:2;">
