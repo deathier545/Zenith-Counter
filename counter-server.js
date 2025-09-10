@@ -259,17 +259,17 @@ function createParticles() {
     const duration = Math.random() * 20 + 10; // 10-30s
     const delay = Math.random() * -20; // -20 to 0s
     
-    particle.style.cssText = `
-      --size: ${size}px;
-      --x: ${x}vw;
-      --duration: ${duration}s;
-      --delay: ${delay}s;
+    particle.style.cssText = \`
+      --size: \${size}px;
+      --x: \${x}vw;
+      --duration: \${duration}s;
+      --delay: \${delay}s;
       width: var(--size);
       height: var(--size);
       left: var(--x);
       animation-duration: var(--duration);
       animation-delay: var(--delay);
-    `;
+    \`;
     
     particlesContainer.appendChild(particle);
   }
