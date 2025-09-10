@@ -178,29 +178,23 @@ ${baseHead}
       </div>
     </div>
 
-    <div class="help">Time elapsed since 3:52 PM Chicago time</div>
+    <div class="help">Time elapsed since downtime</div>
   </main>
 
 <script>
-function getTimeElapsedSinceChicago() {
+function getTimeElapsedSinceDowntime() {
   const now = new Date();
   
-  // Get current Chicago time
-  const chicagoNow = new Date(now.toLocaleString("en-US", {timeZone: "America/Chicago"}));
-  
   // Create 3:52 PM Chicago time for today
-  const chicagoStart = new Date(chicagoNow);
+  const chicagoStart = new Date();
   chicagoStart.setHours(15, 52, 0, 0); // 3:52 PM Chicago time
   
-  // If current Chicago time is before 3:52 PM, use yesterday's 3:52 PM
-  if (chicagoNow < chicagoStart) {
+  // If current time is before 3:52 PM Chicago, use yesterday
+  if (now < chicagoStart) {
     chicagoStart.setDate(chicagoStart.getDate() - 1);
   }
   
-  // Convert Chicago start time to UTC for calculation
-  const chicagoStartUTC = new Date(chicagoStart.toLocaleString("en-US", {timeZone: "America/Chicago"}));
-  
-  const diff = now - chicagoStartUTC;
+  const diff = now - chicagoStart;
   if (diff < 0) return { d:0,h:0,m:0,s:0 };
   
   const d = Math.floor(diff / 86400000);
@@ -213,25 +207,13 @@ function getTimeElapsedSinceChicago() {
 function pad(n){ return String(n).padStart(2,'0'); }
 
 function updateCounter() {
-  const t = getTimeElapsedSinceChicago();
+  const t = getTimeElapsedSinceDowntime();
   document.getElementById('days').textContent = pad(t.d);
   document.getElementById('hours').textContent = pad(t.h);
   document.getElementById('minutes').textContent = pad(t.m);
   document.getElementById('seconds').textContent = pad(t.s);
 }
 
-// Show timezone info for debugging
-function showTimezoneInfo() {
-  const now = new Date();
-  const visitorTime = now.toLocaleString();
-  const chicagoTime = now.toLocaleString("en-US", {timeZone: "America/Chicago"});
-  
-  console.log('Your local time:', visitorTime);
-  console.log('Chicago time:', chicagoTime);
-  console.log('Time elapsed since 3:52 PM Chicago:', getTimeElapsedSinceChicago());
-}
-
-showTimezoneInfo();
 updateCounter();
 setInterval(updateCounter, 1000);
 </script>
