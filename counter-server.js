@@ -4,6 +4,7 @@
 // - Real-time updates via polling
 
 import express from "express";
+import fetch from "node-fetch";
 
 const app = express();
 app.use(express.json({ limit: "256kb" }));
@@ -130,6 +131,7 @@ app.get("/api/time", (req, res) => {
       minutes: time.minutes.toString().padStart(2, '0'),
       seconds: time.seconds.toString().padStart(2, '0')
     },
+    stopped: counterStopped,
     debug: {
       currentTime: now.toLocaleTimeString(),
       startTime: startTime.toLocaleTimeString(),
@@ -182,48 +184,94 @@ ${baseHead}
   </main>
 
 <script>
-function getTimeElapsedSinceDowntime() {
-  const now = new Date();
-  
-  // Create 3:52 PM Chicago time for today
-  const chicagoStart = new Date();
-  chicagoStart.setHours(15, 52, 0, 0); // 3:52 PM Chicago time
-  
-  // If current time is before 3:52 PM Chicago, use yesterday
-  if (now < chicagoStart) {
-    chicagoStart.setDate(chicagoStart.getDate() - 1);
+let counterStopped = false;
+
+async function updateCounter() {
+  if (counterStopped) {
+    // Counter is stopped, don't update
+    return;
   }
   
-  const diff = now - chicagoStart;
-  if (diff < 0) return { d:0,h:0,m:0,s:0 };
-  
-  const d = Math.floor(diff / 86400000);
-  const h = Math.floor((diff % 86400000) / 3600000);
-  const m = Math.floor((diff % 3600000) / 60000);
-  const s = Math.floor((diff % 60000) / 1000);
-  return { d,h,m,s };
+  try {
+    const response = await fetch('/api/time');
+    const data = await response.json();
+    
+    if (data.ok) {
+      document.getElementById('days').textContent = data.time.days;
+      document.getElementById('hours').textContent = data.time.hours;
+      document.getElementById('minutes').textContent = data.time.minutes;
+      document.getElementById('seconds').textContent = data.time.seconds;
+      
+      // Check if counter should be stopped
+      if (data.stopped && !counterStopped) {
+        counterStopped = true;
+        console.log('Counter stopped - site is back up!');
+        // You could add visual indication here if needed
+      }
+    }
+  } catch (error) {
+    console.error('Failed to update counter:', error);
+  }
 }
 
-function pad(n){ return String(n).padStart(2,'0'); }
-
-function updateCounter() {
-  const t = getTimeElapsedSinceDowntime();
-  document.getElementById('days').textContent = pad(t.d);
-  document.getElementById('hours').textContent = pad(t.h);
-  document.getElementById('minutes').textContent = pad(t.m);
-  document.getElementById('seconds').textContent = pad(t.s);
-}
-
+// Initial update
 updateCounter();
+// Update every second
 setInterval(updateCounter, 1000);
 </script>
 </body>`);
 });
 
+// ===== site monitoring =====
+const ZENITH_URL = "https://zenith.win/";
+let lastStatus = null;
+let downtimeStart = null;
+let counterStopped = false;
+const statusPattern = /status-indicator\s+status-(down|up)/i;
+
+async function checkZenithStatus() {
+  try {
+    const res = await fetch(ZENITH_URL, { timeout: 15000 });
+    const html = await res.text();
+    const match = html.match(statusPattern);
+    return match ? match[1].toLowerCase() : "unknown";
+  } catch (error) {
+    console.log(`[zenith-monitor] Error checking site: ${error.message}`);
+    return "down";
+  }
+}
+
+// Monitor zenith.win every minute
+setInterval(async () => {
+  try {
+    const currentStatus = await checkZenithStatus();
+    if (currentStatus !== lastStatus) {
+      console.log(`[zenith-monitor] Status changed: ${lastStatus} -> ${currentStatus}`);
+      
+      if (currentStatus === "down" && lastStatus === "up") {
+        // Site just went down - record the time
+        downtimeStart = new Date();
+        counterStopped = false;
+        console.log(`[zenith-monitor] Site went down at: ${downtimeStart.toLocaleString()}`);
+      } else if (currentStatus === "up" && lastStatus === "down") {
+        // Site came back up - stop the counter
+        console.log(`[zenith-monitor] Site is back up! Stopping counter.`);
+        counterStopped = true;
+        downtimeStart = null;
+      }
+      
+      lastStatus = currentStatus;
+    }
+  } catch (error) {
+    console.log(`[zenith-monitor] Error: ${error.message}`);
+  }
+}, 30000); // Check every 30 seconds
+
 // ===== start =====
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log("Time counter server listening on port", PORT);
+  console.log("Zenith monitoring started - checking every 30 seconds");
   
   // Test the time calculation
   const time = getTimeElapsed();
