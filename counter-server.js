@@ -38,7 +38,19 @@ body{
                       radial-gradient(1200px 800px at 120% 20%, rgba(133,240,137,.10), transparent 55%),
                       var(--bg);
   color:var(--fg); font: 16px/1.45 system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji";
-  display:grid; place-items:center; padding:24px;
+  display:grid; place-items:center; padding:24px; position:relative; overflow:hidden;
+}
+.particles{
+  position:fixed; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:1;
+}
+.particle{
+  position:absolute; background:rgba(76,139,245,.3); border-radius:50%; animation:float linear infinite;
+}
+@keyframes float{
+  0%{ transform:translate(0, 100vh) rotate(0deg); opacity:0; }
+  10%{ opacity:1; }
+  90%{ opacity:1; }
+  100%{ transform:translate(0, -100px) rotate(360deg); opacity:0; }
 }
 .card{
   width:min(720px, 92vw); background:color-mix(in lch, var(--card) 90%, transparent);
@@ -153,7 +165,8 @@ app.get("/", (req, res) => {
     .send(`<!doctype html>
 ${baseHead}
 <body>
-  <main class="card">
+  <div class="particles" id="particles"></div>
+  <main class="card" style="position:relative; z-index:2;">
     <div class="hdr">
       <div class="logo">
         <img src="https://getzenith.org/wp-content/uploads/2025/03/logo-150x150.png" alt="Zenith Logo" style="width: 24px; height: 24px;">
@@ -230,6 +243,40 @@ async function updateCounter() {
 updateCounter();
 // Update every second
 setInterval(updateCounter, 1000);
+
+// Particle animation
+function createParticles() {
+  const particlesContainer = document.getElementById('particles');
+  const particleCount = 15;
+  
+  for (let i = 0; i < particleCount; i++) {
+    const particle = document.createElement('div');
+    particle.className = 'particle';
+    
+    // Random properties
+    const size = Math.random() * 4 + 2; // 2-6px
+    const x = Math.random() * 100; // 0-100vw
+    const duration = Math.random() * 20 + 10; // 10-30s
+    const delay = Math.random() * -20; // -20 to 0s
+    
+    particle.style.cssText = `
+      --size: ${size}px;
+      --x: ${x}vw;
+      --duration: ${duration}s;
+      --delay: ${delay}s;
+      width: var(--size);
+      height: var(--size);
+      left: var(--x);
+      animation-duration: var(--duration);
+      animation-delay: var(--delay);
+    `;
+    
+    particlesContainer.appendChild(particle);
+  }
+}
+
+// Start particles when page loads
+createParticles();
 </script>
 </body>`);
 });
