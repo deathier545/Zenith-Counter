@@ -150,7 +150,7 @@ ${baseHead}
   <main class="card">
     <div class="hdr">
       <div class="logo">
-        <img src="https://zenith.win/static/img/Zenith.svg" alt="Zenith Logo" style="width: 24px; height: 24px;">
+        <img src="https://getzenith.org/wp-content/uploads/2025/03/logo-150x150.png" alt="Zenith Logo" style="width: 24px; height: 24px;">
       </div>
       <div class="h1">Zenith · Down Counter</div>
     </div>
@@ -181,9 +181,8 @@ ${baseHead}
       </div>
     </div>
 
-    <div class="help">Time elapsed since downtime</div>
-    
-    <div style="text-align: right; margin-top: 16px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+      <div class="help">Time elapsed since downtime</div>
       <a href="https://zenith.win/" target="_blank" rel="noopener" style="color: var(--primary); text-decoration: none; font-size: 13px;">
         zenith.win ↗
       </a>
