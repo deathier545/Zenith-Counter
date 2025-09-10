@@ -150,7 +150,9 @@ ${baseHead}
 <body>
   <main class="card">
     <div class="hdr">
-      <div class="logo">⚡</div>
+      <div class="logo">
+        <img src="https://zenith.win/static/img/Zenith.svg" alt="Zenith Logo" style="width: 24px; height: 24px;">
+      </div>
       <div class="h1">Zenith · Down Counter</div>
     </div>
 
@@ -181,6 +183,12 @@ ${baseHead}
     </div>
 
     <div class="help">Time elapsed since downtime</div>
+    
+    <div style="text-align: right; margin-top: 16px;">
+      <a href="https://zenith.win/" target="_blank" rel="noopener" style="color: var(--primary); text-decoration: none; font-size: 13px;">
+        zenith.win ↗
+      </a>
+    </div>
   </main>
 
 <script>
