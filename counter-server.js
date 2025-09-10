@@ -91,14 +91,22 @@ function getStartTime() {
 function getTimeElapsed() {
   const now = new Date();
   
-  // Create start time for today at 3:52 PM
-  const startTime = new Date();
-  startTime.setHours(15, 52, 0, 0); // 3:52 PM today
+  // Get current Chicago time
+  const chicagoNow = new Date(now.toLocaleString("en-US", {timeZone: "America/Chicago"}));
   
-  // Calculate time difference in milliseconds
-  const timeDiff = now.getTime() - startTime.getTime();
+  // Create 3:52 PM Chicago time for today
+  const chicagoStart = new Date(chicagoNow);
+  chicagoStart.setHours(15, 52, 0, 0); // 3:52 PM Chicago time
   
-  // If negative, it means we're before 3:52 PM today
+  // If current Chicago time is before 3:52 PM, use yesterday
+  if (chicagoNow < chicagoStart) {
+    chicagoStart.setDate(chicagoStart.getDate() - 1);
+  }
+  
+  // Convert Chicago start time to UTC for calculation
+  const chicagoStartUTC = new Date(chicagoStart.toLocaleString("en-US", {timeZone: "America/Chicago"}));
+  
+  const timeDiff = now - chicagoStartUTC;
   if (timeDiff < 0) {
     return { days: 0, hours: 0, minutes: 0, seconds: 0 };
   }
