@@ -1,0 +1,17 @@
+{
+  "name": "moonhub-time-counter",
+  "version": "1.0.0",
+  "description": "MoonHub Time Counter - counts time since 3:52 PM",
+  "main": "counter-server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node counter-server.js",
+    "dev": "node counter-server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
