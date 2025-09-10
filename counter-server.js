@@ -91,7 +91,7 @@ function getStartTime() {
 function getTimeElapsed() {
   const now = new Date();
   
-  // Get current Chicago time
+  // Get current time in Chicago timezone
   const chicagoNow = new Date(now.toLocaleString("en-US", {timeZone: "America/Chicago"}));
   
   // Create 3:52 PM Chicago time for today
@@ -103,10 +103,8 @@ function getTimeElapsed() {
     chicagoStart.setDate(chicagoStart.getDate() - 1);
   }
   
-  // Convert Chicago start time to UTC for calculation
-  const chicagoStartUTC = new Date(chicagoStart.toLocaleString("en-US", {timeZone: "America/Chicago"}));
-  
-  const timeDiff = now - chicagoStartUTC;
+  // Calculate the difference in Chicago time
+  const timeDiff = chicagoNow - chicagoStart;
   if (timeDiff < 0) {
     return { days: 0, hours: 0, minutes: 0, seconds: 0 };
   }
