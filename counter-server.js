@@ -1,8 +1,3 @@
-// counter-server.js — MoonHub Time Counter (Node >= 20)
-// - Time counter since 3:52 PM with MoonHub styling
-// - Same design language as main server.js
-// - Real-time updates via polling
-
 import express from "express";
 
 const app = express();
@@ -85,6 +80,37 @@ body{
 @media (max-width: 600px) {
   .time-unit{ min-width:60px; padding:12px 8px; }
   .time-value{ font-size:20px; }
+  .card{ padding:16px 12px; }
+  .hdr{ margin-bottom:12px; }
+  .counter{ gap:8px; margin:16px 0; }
+}
+@media (max-width: 400px) {
+  .time-unit{ min-width:50px; padding:10px 6px; }
+  .time-value{ font-size:18px; }
+  .time-label{ font-size:11px; }
+}
+.offline-indicator{
+  background:var(--warn); color:var(--bg); padding:4px 8px; border-radius:999px; 
+  font-size:12px; font-weight:600; margin-left:8px;
+}
+.connection-status{
+  display:flex; align-items:center; gap:8px; margin-top:8px; font-size:12px;
+}
+.status-dot{
+  width:8px; height:8px; border-radius:50%; background:var(--ok);
+}
+.status-dot.offline{ background:var(--warn); }
+.status-dot.error{ background:#ff6b6b; }
+.sr-only{
+  position:absolute; width:1px; height:1px; padding:0; margin:-1px; 
+  overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
+}
+.keyboard-navigation *:focus{
+  outline:2px solid var(--primary); outline-offset:2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .particle{ animation:none; }
+  *{ animation-duration:0.01ms !important; animation-iteration-count:1 !important; }
 }
 </style>
 `;
@@ -93,10 +119,10 @@ body{
 function getStartTime() {
   const now = new Date();
   const startTime = new Date(now);
-  startTime.setHours(15, 52, 0, 0); // 3:52 PM
+  startTime.setHours(16, 22, 0, 0); // 4:22 PM
   
-  // Always use today's 3:52 PM, even if we're past it
-  // This ensures we're counting from 3:52 PM today
+  // Always use today's 4:22 PM, even if we're past it
+  // This ensures we're counting from 4:22 PM today
   return startTime;
 }
 
@@ -106,11 +132,11 @@ function getTimeElapsed() {
   // Get current time in Chicago timezone
   const chicagoNow = new Date(now.toLocaleString("en-US", {timeZone: "America/Chicago"}));
   
-  // Create 3:52 PM Chicago time for today
+  // Create 4:22 PM Chicago time for today
   const chicagoStart = new Date(chicagoNow);
-  chicagoStart.setHours(15, 52, 0, 0); // 3:52 PM Chicago time
+  chicagoStart.setHours(16, 22, 0, 0); // 4:22 PM Chicago time
   
-  // If current Chicago time is before 3:52 PM, use yesterday
+  // If current Chicago time is before 4:22 PM, use yesterday
   if (chicagoNow < chicagoStart) {
     chicagoStart.setDate(chicagoStart.getDate() - 1);
   }
@@ -138,7 +164,7 @@ app.get("/api/time", (req, res) => {
   const time = getTimeElapsed();
   const now = new Date();
   const startTime = new Date(now);
-  startTime.setHours(15, 52, 0, 0);
+  startTime.setHours(16, 22, 0, 0);
   
   res.json({ 
     ok: true, 
@@ -175,83 +201,262 @@ app.get("/", (req, res) => {
     </div>
 
     <div class="row">
-      <div class="pill">Since: <strong>3:52 PM</strong></div>
-      <div class="pill badge">Live</div>
+      <div class="pill">Since: <strong>4:22 PM</strong></div>
+      <div class="pill badge" id="status-badge">Live</div>
+      <div class="offline-indicator" id="offline-indicator" style="display:none;">Offline</div>
     </div>
 
     <div class="hr"></div>
 
-    <div class="counter" id="counter">
+    <div class="counter" id="counter" role="timer" aria-live="polite" aria-label="Downtime counter">
       <div class="time-unit">
-        <div class="time-value" id="days">00</div>
+        <div class="time-value" id="days" aria-label="Days">00</div>
         <div class="time-label">Days</div>
       </div>
       <div class="time-unit">
-        <div class="time-value" id="hours">00</div>
+        <div class="time-value" id="hours" aria-label="Hours">00</div>
         <div class="time-label">Hours</div>
       </div>
       <div class="time-unit">
-        <div class="time-value" id="minutes">00</div>
+        <div class="time-value" id="minutes" aria-label="Minutes">00</div>
         <div class="time-label">Minutes</div>
       </div>
       <div class="time-unit">
-        <div class="time-value" id="seconds">00</div>
+        <div class="time-value" id="seconds" aria-label="Seconds">00</div>
         <div class="time-label">Seconds</div>
       </div>
     </div>
 
     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
       <div class="help">Time elapsed since downtime</div>
-      <a href="https://zenith.win/" target="_blank" rel="noopener" style="color: var(--primary); text-decoration: none; font-size: 13px;">
+      <a href="https://zenith.win/" target="_blank" rel="noopener" style="color: var(--primary); text-decoration: none; font-size: 13px;" aria-label="Visit zenith.win website">
         zenith.win ↗
       </a>
+    </div>
+    
+    <div class="connection-status" id="connection-status">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="connection-text">Connected</span>
     </div>
   </main>
 
 <script>
+// Enhanced UX State Management
 let counterStopped = false;
+let isOnline = navigator.onLine;
+let lastUpdateTime = null;
+let cachedData = null;
+let retryCount = 0;
+let maxRetries = 3;
+let updateInterval = null;
 
+// Connection status elements
+const statusDot = document.getElementById('status-dot');
+const connectionText = document.getElementById('connection-text');
+const offlineIndicator = document.getElementById('offline-indicator');
+const statusBadge = document.getElementById('status-badge');
+
+// Update connection status UI
+function updateConnectionStatus(online, error = false) {
+  const wasOnline = isOnline;
+  isOnline = online;
+  
+  if (online && !error) {
+    statusDot.className = 'status-dot';
+    connectionText.textContent = 'Connected';
+    offlineIndicator.style.display = 'none';
+    statusBadge.textContent = 'Live';
+    statusBadge.className = 'pill badge';
+    
+    if (!wasOnline) {
+      announceToScreenReader('Connection restored. Counter is now live.');
+    }
+  } else if (error) {
+    statusDot.className = 'status-dot error';
+    connectionText.textContent = 'Connection Error';
+    offlineIndicator.style.display = 'inline-block';
+    offlineIndicator.textContent = 'Error';
+    statusBadge.textContent = 'Error';
+    statusBadge.className = 'pill';
+    
+    if (wasOnline) {
+      announceToScreenReader('Connection error. Using cached data.');
+    }
+  } else {
+    statusDot.className = 'status-dot offline';
+    connectionText.textContent = 'Offline';
+    offlineIndicator.style.display = 'inline-block';
+    offlineIndicator.textContent = 'Offline';
+    statusBadge.textContent = 'Offline';
+    statusBadge.className = 'pill';
+    
+    if (wasOnline) {
+      announceToScreenReader('Connection lost. Displaying cached data.');
+    }
+  }
+}
+
+// Update counter display with accessibility
+function updateCounterDisplay(data) {
+  const daysEl = document.getElementById('days');
+  const hoursEl = document.getElementById('hours');
+  const minutesEl = document.getElementById('minutes');
+  const secondsEl = document.getElementById('seconds');
+  
+  daysEl.textContent = data.time.days;
+  hoursEl.textContent = data.time.hours;
+  minutesEl.textContent = data.time.minutes;
+  secondsEl.textContent = data.time.seconds;
+  
+  // Update accessibility labels
+  const timeString = data.time.days + ' days, ' + data.time.hours + ' hours, ' + data.time.minutes + ' minutes, ' + data.time.seconds + ' seconds';
+  document.getElementById('counter').setAttribute('aria-label', 'Downtime counter: ' + timeString);
+  
+  // Cache the data for offline use
+  cachedData = {
+    ...data,
+    timestamp: Date.now()
+  };
+  
+  lastUpdateTime = Date.now();
+}
+
+// Enhanced counter update with offline support
 async function updateCounter() {
   if (counterStopped) {
-    // Counter is stopped, don't update
     return;
   }
   
+  // If offline, use cached data if available
+  if (!isOnline && cachedData) {
+    const timeSinceCache = Date.now() - cachedData.timestamp;
+    if (timeSinceCache < 60000) { // Use cache if less than 1 minute old
+      updateConnectionStatus(false);
+      return;
+    }
+  }
+  
   try {
-    const response = await fetch('/api/time');
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
+    const response = await fetch('/api/time', {
+      signal: controller.signal,
+      headers: {
+        'Cache-Control': 'no-cache'
+      }
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      throw new Error('HTTP ' + response.status);
+    }
+    
     const data = await response.json();
     
     if (data.ok) {
-      document.getElementById('days').textContent = data.time.days;
-      document.getElementById('hours').textContent = data.time.hours;
-      document.getElementById('minutes').textContent = data.time.minutes;
-      document.getElementById('seconds').textContent = data.time.seconds;
+      updateCounterDisplay(data);
+      updateConnectionStatus(true);
+      retryCount = 0; // Reset retry count on success
       
       // Check if counter should be stopped
       if (data.stopped && !counterStopped) {
         counterStopped = true;
         console.log('Counter stopped - site is back up!');
-        // You could add visual indication here if needed
+        statusBadge.textContent = 'Back Online';
+        statusBadge.className = 'pill badge';
+        clearInterval(updateInterval);
       }
+    } else {
+      throw new Error('Invalid response data');
     }
   } catch (error) {
     console.error('Failed to update counter:', error);
+    
+    // Use cached data if available
+    if (cachedData) {
+      updateCounterDisplay(cachedData);
+      updateConnectionStatus(false);
+    } else {
+      updateConnectionStatus(false, true);
+    }
+    
+    // Implement exponential backoff for retries
+    retryCount++;
+    if (retryCount <= maxRetries) {
+      const delay = Math.min(1000 * Math.pow(2, retryCount), 30000); // Max 30 seconds
+      setTimeout(() => {
+        if (!counterStopped) {
+          updateCounter();
+        }
+      }, delay);
+    }
   }
 }
 
+// Network event listeners
+window.addEventListener('online', () => {
+  console.log('Network connection restored');
+  updateConnectionStatus(true);
+  retryCount = 0;
+  updateCounter();
+});
+
+window.addEventListener('offline', () => {
+  console.log('Network connection lost');
+  updateConnectionStatus(false);
+});
+
+// Keyboard navigation support
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'r' || e.key === 'R') {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      updateCounter();
+    }
+  }
+});
+
 // Initial update
 updateCounter();
-// Update every second
-setInterval(updateCounter, 1000);
 
-// Particle animation
+// Update every second with error handling
+updateInterval = setInterval(() => {
+  if (!counterStopped) {
+    updateCounter();
+  }
+}, 1000);
+
+// Screen reader announcements
+function announceToScreenReader(message) {
+  const announcement = document.createElement('div');
+  announcement.className = 'sr-only';
+  announcement.setAttribute('aria-live', 'polite');
+  announcement.textContent = message;
+  document.body.appendChild(announcement);
+  
+  // Remove after announcement
+  setTimeout(() => {
+    document.body.removeChild(announcement);
+  }, 1000);
+}
+
+// Enhanced particle animation with reduced motion support
 function createParticles() {
   const particlesContainer = document.getElementById('particles');
+  
+  // Respect user's motion preferences
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    return; // Skip particles for users who prefer reduced motion
+  }
+  
   const particleCount = 15;
   
   for (let i = 0; i < particleCount; i++) {
     const particle = document.createElement('div');
     particle.className = 'particle';
+    particle.setAttribute('aria-hidden', 'true'); // Hide from screen readers
     
     // Random properties
     const size = Math.random() * 4 + 2; // 2-6px
@@ -275,8 +480,24 @@ function createParticles() {
   }
 }
 
-// Start particles when page loads
-createParticles();
+// Initialize everything when page loads
+document.addEventListener('DOMContentLoaded', () => {
+  createParticles();
+  
+  // Add focus management for keyboard users
+  document.body.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') {
+      document.body.classList.add('keyboard-navigation');
+    }
+  });
+  
+  document.body.addEventListener('mousedown', () => {
+    document.body.classList.remove('keyboard-navigation');
+  });
+  
+  // Announce initial status
+  announceToScreenReader('Downtime counter loaded. Time elapsed since 4:22 PM is being tracked.');
+});
 </script>
 </body>`);
 });
@@ -295,7 +516,7 @@ async function checkZenithStatus() {
     const match = html.match(statusPattern);
     return match ? match[1].toLowerCase() : "unknown";
   } catch (error) {
-    console.log(`[zenith-monitor] Error checking site: ${error.message}`);
+    console.log('[zenith-monitor] Error checking site: ' + error.message);
     return "down";
   }
 }
@@ -305,13 +526,13 @@ setInterval(async () => {
   try {
     const currentStatus = await checkZenithStatus();
     if (currentStatus !== lastStatus) {
-      console.log(`[zenith-monitor] Status changed: ${lastStatus} -> ${currentStatus}`);
+      console.log('[zenith-monitor] Status changed: ' + lastStatus + ' -> ' + currentStatus);
       
       if (currentStatus === "down" && lastStatus === "up") {
         // Site just went down - record the time
         downtimeStart = new Date();
         counterStopped = false;
-        console.log(`[zenith-monitor] Site went down at: ${downtimeStart.toLocaleString()}`);
+        console.log('[zenith-monitor] Site went down at: ' + downtimeStart.toLocaleString());
       } else if (currentStatus === "up" && lastStatus === "down") {
         // Site came back up - stop the counter
         console.log(`[zenith-monitor] Site is back up! Stopping counter.`);
@@ -322,7 +543,7 @@ setInterval(async () => {
       lastStatus = currentStatus;
     }
   } catch (error) {
-    console.log(`[zenith-monitor] Error: ${error.message}`);
+    console.log('[zenith-monitor] Error: ' + error.message);
   }
 }, 30000); // Check every 30 seconds
 
@@ -336,5 +557,5 @@ app.listen(PORT, () => {
   const time = getTimeElapsed();
   const now = new Date();
   console.log("Current time:", now.toLocaleTimeString());
-  console.log("Time elapsed since 3:52 PM:", `${time.hours}h ${time.minutes}m ${time.seconds}s`);
+  console.log("Time elapsed since 4:22 PM:", `${time.hours}h ${time.minutes}m ${time.seconds}s`);
 });
